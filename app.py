@@ -251,8 +251,17 @@ function row(label, value, cls='') {
   </div>`;
 }
 
+// Busca valor tolerando variações de acentuação
 function get(f, ...keys) {
-  for (const k of keys) if (f[k]) return f[k];
+  for (const k of keys) {
+    if (f[k] !== undefined && f[k] !== '') return f[k];
+  }
+  // Busca parcial como fallback
+  for (const k of keys) {
+    const clean = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const found = Object.keys(f).find(fk => fk.toLowerCase().replace(/[^a-z0-9]/g, '') === clean);
+    if (found) return f[found];
+  }
   return 'N/A';
 }
 
@@ -261,8 +270,8 @@ function renderDashboard(d, ticker) {
   const divs = d.dividendos;
 
   document.getElementById('heroTicker').textContent = ticker;
-  document.getElementById('heroNome').textContent = get(f, 'Empresa');
-  document.getElementById('heroPreco').textContent = 'R$ ' + get(f, 'Cotação', 'Cotacao', 'Cota\u00e7\u00e3o');
+  document.getElementById('heroNome').textContent = get(f, 'Empresa') === 'N/A' ? '' : get(f, 'Empresa');
+  document.getElementById('heroPreco').textContent = 'R$ ' + get(f, 'Cotação', 'Cotacao');
   const varDia = f['Dia'] || '';
   const varEl = document.getElementById('heroVar');
   varEl.textContent = 'Variação do dia: ' + varDia;
@@ -273,44 +282,48 @@ function renderDashboard(d, ticker) {
   document.getElementById('hlDY').textContent   = get(f, 'Div. Yield');
   document.getElementById('hlROE').textContent  = get(f, 'ROE');
   document.getElementById('hlEV').textContent   = get(f, 'EV / EBITDA');
-  document.getElementById('hlMarg').textContent = get(f, 'Marg. Líquida', 'Marg. L\u00edquida', 'Marg. Liquida');
+  document.getElementById('hlMarg').textContent = get(f, 'Marg. Líquida', 'Marg. Liquida');
 
   const oscs = [
-    {l:'DIA', v:f['Dia']}, {l:'MÊS', v:get(f,'Mês','M\u00eas')},
-    {l:'30 DIAS', v:f['30 dias']}, {l:'12 MESES', v:f['12 meses']},
-    {l:'2026', v:f['2026']}, {l:'2025', v:f['2025']},
-    {l:'2024', v:f['2024']}, {l:'2023', v:f['2023']},
+    {l:'DIA',      v: f['Dia']},
+    {l:'MÊS',      v: get(f,'Mês','Mes')},
+    {l:'30 DIAS',  v: f['30 dias']},
+    {l:'12 MESES', v: f['12 meses']},
+    {l:'2026',     v: f['2026']},
+    {l:'2025',     v: f['2025']},
+    {l:'2024',     v: f['2024']},
+    {l:'2023',     v: f['2023']},
   ];
   document.getElementById('oscGrid').innerHTML = oscs.map(o =>
     `<div class="osc-item"><div class="osc-label">${o.l}</div><div class="osc-val ${colorVal(o.v)}">${o.v || 'N/A'}</div></div>`
   ).join('');
 
   document.getElementById('valuation').innerHTML =
-    row('Cotação',        'R$ ' + get(f,'Cotação','Cotacao')) +
-    row('P/L',            get(f,'P/L'), 'highlight') +
-    row('P/VP',           get(f,'P/VP')) +
-    row('P/EBIT',         get(f,'P/EBIT')) +
-    row('PSR',            get(f,'PSR')) +
-    row('EV/EBITDA',      get(f,'EV / EBITDA')) +
-    row('EV/EBIT',        get(f,'EV / EBIT')) +
-    row('LPA',            'R$ ' + get(f,'LPA')) +
-    row('VPA',            'R$ ' + get(f,'VPA')) +
+    row('Cotação',         'R$ ' + get(f,'Cotação','Cotacao')) +
+    row('P/L',             get(f,'P/L'), 'highlight') +
+    row('P/VP',            get(f,'P/VP')) +
+    row('P/EBIT',          get(f,'P/EBIT')) +
+    row('PSR',             get(f,'PSR')) +
+    row('EV/EBITDA',       get(f,'EV / EBITDA')) +
+    row('EV/EBIT',         get(f,'EV / EBIT')) +
+    row('LPA',             'R$ ' + get(f,'LPA')) +
+    row('VPA',             'R$ ' + get(f,'VPA')) +
     row('Valor de Mercado','R$ ' + get(f,'Valor de mercado')) +
-    row('Valor da Firma', 'R$ ' + get(f,'Valor da firma')) +
-    row('Nro. Ações',     get(f,'Nro. Ações','Nro. Acoes'));
+    row('Valor da Firma',  'R$ ' + get(f,'Valor da firma')) +
+    row('Nro. Ações',      get(f,'Nro. Ações','Nro. Acoes'));
 
   document.getElementById('rentabilidade').innerHTML =
-    row('Div. Yield',   get(f,'Div. Yield'), 'amber') +
-    row('ROE',          get(f,'ROE')) +
-    row('ROIC',         get(f,'ROIC')) +
-    row('Marg. Bruta',  get(f,'Marg. Bruta')) +
-    row('Marg. EBIT',   get(f,'Marg. EBIT')) +
-    row('Marg. Líquida',get(f,'Marg. Líquida','Marg. Liquida')) +
-    row('Dív. Bruta',   'R$ ' + get(f,'Dív. Bruta','Div. Bruta')) +
-    row('Dív. Líquida', 'R$ ' + get(f,'Dív. Líquida','Div. Liquida')) +
+    row('Div. Yield',    get(f,'Div. Yield'), 'amber') +
+    row('ROE',           get(f,'ROE')) +
+    row('ROIC',          get(f,'ROIC')) +
+    row('Marg. Bruta',   get(f,'Marg. Bruta')) +
+    row('Marg. EBIT',    get(f,'Marg. EBIT')) +
+    row('Marg. Líquida', get(f,'Marg. Líquida','Marg. Liquida')) +
+    row('Dív. Bruta',    'R$ ' + get(f,'Dív. Bruta','Div. Bruta')) +
+    row('Dív. Líquida',  'R$ ' + get(f,'Dív. Líquida','Div. Liquida')) +
     row('Div Br/Patrim', get(f,'Div Br/ Patrim')) +
     row('Liquidez Corr', get(f,'Liquidez Corr')) +
-    row('Patrim. Líq',  'R$ ' + get(f,'Patrim. Líq','Patrim. Liq')) +
+    row('Patrim. Líq',   'R$ ' + get(f,'Patrim. Líq','Patrim. Liq')) +
     row('Cres. Rec (5a)',get(f,'Cres. Rec (5a)'));
 
   renderChart(divs);
@@ -463,36 +476,6 @@ def scrape_dividendos(ticker):
 def index():
     return render_template_string(HTML)
 
-@app.route("/debug")
-def debug():
-    try:
-        scraper = get_scraper()
-        url = "https://www.fundamentus.com.br/detalhes.php?papel=PETR4"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept-Language": "pt-BR,pt;q=0.9",
-            "Referer": "https://www.fundamentus.com.br/"
-        }
-        resp = scraper.get(url, headers=headers, timeout=15)
-        soup = BeautifulSoup(resp.text, "html.parser")
-        dados = {}
-        for row in soup.find_all("tr"):
-            cols = row.find_all("td")
-            for i in range(0, len(cols) - 1, 2):
-                label = cols[i].get_text(strip=True).replace("?", "").strip()
-                valor = cols[i+1].get_text(strip=True)
-                if label:
-                    dados[label] = valor
-        return jsonify({
-            "status_http": resp.status_code,
-            "total_chaves": len(dados),
-            "chaves": list(dados.keys()),
-            "primeiros_dados": dict(list(dados.items())[:15]),
-            "html_snippet": resp.text[:300]
-        })
-    except Exception as e:
-        return jsonify({"erro": str(e)})
-
 @app.route("/dados")
 def dados():
     ticker = request.args.get("ticker", "").upper().strip()
@@ -500,10 +483,9 @@ def dados():
         return jsonify({"erro": "Ticker não informado."})
     try:
         f = scrape_fundamentus(ticker)
-        # Aceita qualquer variação da chave Cotação
-        tem_cotacao = any('ota' in k for k in f.keys())
-        if not f or not tem_cotacao:
-            return jsonify({"erro": f"Ticker '{ticker}' não encontrado.", "chaves_encontradas": list(f.keys())[:10]})
+        # Considera válido se tiver pelo menos 5 campos
+        if not f or len(f) < 5:
+            return jsonify({"erro": f"Ticker '{ticker}' não encontrado."})
         d = scrape_dividendos(ticker)
         return jsonify({"fundamentus": f, "dividendos": d})
     except Exception as e:
