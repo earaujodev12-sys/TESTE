@@ -251,12 +251,10 @@ function row(label, value, cls='') {
   </div>`;
 }
 
-// Busca valor tolerando variações de acentuação
 function get(f, ...keys) {
   for (const k of keys) {
     if (f[k] !== undefined && f[k] !== '') return f[k];
   }
-  // Busca parcial como fallback
   for (const k of keys) {
     const clean = k.toLowerCase().replace(/[^a-z0-9]/g, '');
     const found = Object.keys(f).find(fk => fk.toLowerCase().replace(/[^a-z0-9]/g, '') === clean);
@@ -270,19 +268,19 @@ function renderDashboard(d, ticker) {
   const divs = d.dividendos;
 
   document.getElementById('heroTicker').textContent = ticker;
-  document.getElementById('heroNome').textContent = get(f, 'Empresa') === 'N/A' ? '' : get(f, 'Empresa');
-  document.getElementById('heroPreco').textContent = 'R$ ' + get(f, 'Cotação', 'Cotacao');
+  document.getElementById('heroNome').textContent = get(f,'Empresa') === 'N/A' ? '' : get(f,'Empresa');
+  document.getElementById('heroPreco').textContent = 'R$ ' + get(f,'Cotação','Cotacao');
   const varDia = f['Dia'] || '';
   const varEl = document.getElementById('heroVar');
   varEl.textContent = 'Variação do dia: ' + varDia;
   varEl.className = 'var ' + colorVal(varDia);
 
-  document.getElementById('hlPL').textContent   = get(f, 'P/L');
-  document.getElementById('hlPVP').textContent  = get(f, 'P/VP');
-  document.getElementById('hlDY').textContent   = get(f, 'Div. Yield');
-  document.getElementById('hlROE').textContent  = get(f, 'ROE');
-  document.getElementById('hlEV').textContent   = get(f, 'EV / EBITDA');
-  document.getElementById('hlMarg').textContent = get(f, 'Marg. Líquida', 'Marg. Liquida');
+  document.getElementById('hlPL').textContent   = get(f,'P/L');
+  document.getElementById('hlPVP').textContent  = get(f,'P/VP');
+  document.getElementById('hlDY').textContent   = get(f,'Div. Yield');
+  document.getElementById('hlROE').textContent  = get(f,'ROE');
+  document.getElementById('hlEV').textContent   = get(f,'EV / EBITDA');
+  document.getElementById('hlMarg').textContent = get(f,'Marg. Líquida','Marg. Liquida');
 
   const oscs = [
     {l:'DIA',      v: f['Dia']},
@@ -483,9 +481,22 @@ def dados():
         return jsonify({"erro": "Ticker não informado."})
     try:
         f = scrape_fundamentus(ticker)
-        # Considera válido se tiver pelo menos 5 campos
+
+        # Modo debug: retorna tudo para diagnóstico
+        if request.args.get("debug"):
+            return jsonify({
+                "total_campos": len(f),
+                "campos": list(f.keys()),
+                "valores": dict(list(f.items())[:15])
+            })
+
         if not f or len(f) < 5:
-            return jsonify({"erro": f"Ticker '{ticker}' não encontrado."})
+            return jsonify({
+                "erro": f"Ticker '{ticker}' não encontrado.",
+                "campos_recebidos": len(f),
+                "campos": list(f.keys())
+            })
+
         d = scrape_dividendos(ticker)
         return jsonify({"fundamentus": f, "dividendos": d})
     except Exception as e:
