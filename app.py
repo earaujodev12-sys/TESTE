@@ -1,7 +1,7 @@
 from flask import Flask, render_template_string, jsonify, request
 import cloudscraper
 from bs4 import BeautifulSoup
-
+import os
 app = Flask(__name__)
 
 HTML = """
