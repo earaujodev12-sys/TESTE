@@ -1,5 +1,6 @@
+streamlit
 flask
 cloudscraper
-streamlit
+beautifulsoup4
 pandas
 colorama
