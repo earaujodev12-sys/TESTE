@@ -1,4 +1,4 @@
 flask
-requests
+cloudscraper
 beautifulsoup4
 gunicorn
