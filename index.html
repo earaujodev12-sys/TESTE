@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fundamentus Card</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;700&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { min-height: 100vh; background: linear-gradient(135deg,#090e1c 0%,#0d1117 60%,#090e1c 100%); color: #e2e8f0; font-family: 'DM Sans', sans-serif; padding: 32px 20px; }
+    #app { max-width: 760px; margin: 0 auto; }
+    .search-wrap { position: relative; margin-bottom: 12px; }
+    .search-input { width: 100%; background: rgba(255,255,255,0.04); border: 1.5px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 14px 56px 14px 18px; font-family: 'Roboto Mono',monospace; font-size: 20px; font-weight: 700; color: #22d3a5; letter-spacing: 5px; text-transform: uppercase; outline: none; transition: border-color .2s, box-shadow .2s; }
+    .search-input::placeholder { color: #1e293b; letter-spacing: 2px; font-size: 14px; font-weight: 400; }
+    .search-input:focus { border-color: #22d3a5; box-shadow: 0 0 0 3px rgba(34,211,165,.1); }
+    .search-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: #22d3a5; border: none; cursor: pointer; width: 38px; height: 38px; border-radius: 8px; font-size: 18px; color: #000; font-weight: bold; }
+    .search-btn:hover { background: #34d399; }
+    .search-btn:disabled { background: #134e4a; cursor: not-allowed; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+    .chip { cursor: pointer; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding: 5px 12px; border-radius: 20px; font-size: 12px; font-family: 'Roboto Mono',monospace; color: #475569; font-weight: 600; letter-spacing: 1px; }
+    .chip:hover { border-color: #22d3a5; color: #22d3a5; }
+    .card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 24px 28px; margin-bottom: 14px; }
+    .header-top { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; }
+    .papel { font-size: 28px; font-weight: 700; color: #f1f5f9; font-family: 'Roboto Mono',monospace; }
+    .tipo-badge { background: rgba(34,211,165,0.1); color: #22d3a5; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; letter-spacing: 1px; margin-left: 8px; }
+    .empresa { color: #64748b; font-size: 13px; margin: 4px 0 2px; }
+    .setor { color: #334155; font-size: 12px; }
+    .cotacao { font-size: 32px; font-weight: 700; font-family: 'Roboto Mono',monospace; color: #f1f5f9; text-align: right; }
+    .variacao { font-size: 14px; font-weight: 600; font-family: monospace; text-align: right; }
+    .data-cot { color: #334155; font-size: 11px; text-align: right; margin-top: 2px; }
+    .range-labels { display: flex; justify-content: space-between; font-size: 11px; color: #475569; margin: 20px 0 6px; }
+    .range-bar { height: 5px; background: rgba(255,255,255,0.07); border-radius: 3px; position: relative; }
+    .range-fill { position: absolute; left: 0; height: 100%; background: linear-gradient(90deg,#1e40af,#22d3a5); border-radius: 3px; }
+    .range-dot { position: absolute; top: -3px; width: 11px; height: 11px; background: #22d3a5; border-radius: 50%; box-shadow: 0 0 8px #22d3a5; transform: translateX(-50%); }
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(150px,1fr)); gap: 10px; margin-top: 20px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.05); }
+    .kpi-grid-sm { display: grid; grid-template-columns: repeat(auto-fill,minmax(130px,1fr)); gap: 10px; }
+    .kpi { padding: 12px 14px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); cursor: default; }
+    .kpi:hover { border-color: rgba(34,211,165,0.3); background: rgba(34,211,165,0.04); }
+    .kpi-label { font-size: 10px; color: #475569; letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 6px; }
+    .kpi-value { font-size: 17px; font-weight: 700; color: #e2e8f0; font-family: 'Roboto Mono',monospace; }
+    .osc-strip { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 14px 20px; margin-bottom: 14px; display: flex; justify-content: space-around; flex-wrap: wrap; gap: 12px; }
+    .osc-item { text-align: center; min-width: 60px; }
+    .osc-label { font-size: 10px; color: #64748b; margin-bottom: 4px; letter-spacing: 1px; }
+    .osc-val { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 4px; font-family: monospace; }
+    .pos { color: #22d3a5; background: rgba(34,211,165,0.08); }
+    .neg { color: #f87171; background: rgba(248,113,113,0.08); }
+    .tabs-bar { display: flex; border-bottom: 1px solid rgba(255,255,255,0.06); overflow-x: auto; }
+    .tab-btn { background: transparent; border: none; cursor: pointer; padding: 10px 20px; font-family: 'DM Sans',sans-serif; font-size: 13px; font-weight: 500; color: #475569; border-bottom: 2px solid transparent; white-space: nowrap; }
+    .tab-btn:hover { color: #94a3b8; }
+    .tab-btn.active { color: #22d3a5; border-bottom-color: #22d3a5; }
+    .tab-content { padding: 22px 26px; }
+    .section { margin-bottom: 24px; }
+    .section-title { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 11px; font-weight: 600; letter-spacing: 2px; color: #64748b; text-transform: uppercase; }
+    .section-bar { width: 3px; height: 14px; background: #22d3a5; border-radius: 2px; }
+    .spinner-box { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 48px; text-align: center; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { width: 32px; height: 32px; border: 3px solid rgba(34,211,165,0.15); border-top-color: #22d3a5; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+    .error-box { background: rgba(248,113,113,0.05); border: 1px solid rgba(248,113,113,0.25); border-radius: 12px; padding: 18px; color: #f87171; font-size: 13px; font-family: monospace; }
+    .empty-box { text-align: center; padding: 64px 0; }
+    .fade-in { animation: fadeIn .35s ease; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+    .footer { text-align: center; margin-top: 14px; color: #1e293b; font-size: 11px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="search-wrap">
+    <input id="search" class="search-input" placeholder="Digite o ticker  ex: PETR4" maxlength="6" />
+    <button id="btn" class="search-btn">→</button>
+  </div>
+  <div class="chips" id="chips"></div>
+
+  <div id="loading" class="spinner-box hidden">
+    <div class="spinner"></div>
+    <div id="loading-ticker" style="color:#22d3a5;font-size:14px;font-family:monospace;font-weight:600"></div>
+    <div style="color:#475569;font-size:13px;margin-top:6px">Buscando dados…</div>
+  </div>
+
+  <div id="error" class="error-box hidden"></div>
+
+  <div id="empty" class="empty-box">
+    <div style="font-size:44px;margin-bottom:14px">📈</div>
+    <div style="font-size:15px;color:#334155">Digite um ticker para ver os indicadores</div>
+    <div style="font-size:12px;margin-top:6px;color:#1e293b">Dados via Fundamentus</div>
+  </div>
+
+  <div id="result" class="hidden fade-in">
+    <!-- Header -->
+    <div class="card">
+      <div class="header-top">
+        <div>
+          <div><span id="h-papel" class="papel"></span><span id="h-tipo" class="tipo-badge"></span></div>
+          <div id="h-empresa" class="empresa"></div>
+          <div id="h-setor" class="setor"></div>
+        </div>
+        <div>
+          <div id="h-cotacao" class="cotacao"></div>
+          <div id="h-var" class="variacao"></div>
+          <div id="h-data" class="data-cot"></div>
+        </div>
+      </div>
+      <div class="range-labels">
+        <span id="r-min"></span>
+        <span id="r-cur" style="color:#94a3b8;font-weight:600"></span>
+        <span id="r-max"></span>
+      </div>
+      <div class="range-bar">
+        <div id="r-fill" class="range-fill"></div>
+        <div id="r-dot"  class="range-dot"></div>
+      </div>
+      <div class="kpi-grid" id="kpi-mercado"></div>
+    </div>
+
+    <!-- Oscilações -->
+    <div class="osc-strip" id="osc-strip"></div>
+
+    <!-- Tabs -->
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="tabs-bar" id="tabs-bar"></div>
+      <div class="tab-content" id="tab-content"></div>
+    </div>
+
+    <div id="footer" class="footer"></div>
+  </div>
+</div>
+
+<script>
+const sugestoes = ["PETR4","VALE3","ITUB4","BBDC4","WEGE3","RENT3","EGIE3","B3SA3"];
+const chipsEl = document.getElementById("chips");
+sugestoes.forEach(s => {
+  const b = document.createElement("button");
+  b.className = "chip"; b.textContent = s;
+  b.onclick = () => { document.getElementById("search").value = s; buscar(); };
+  chipsEl.appendChild(b);
+});
+
+document.getElementById("search").addEventListener("keydown", e => { if (e.key === "Enter") buscar(); });
+document.getElementById("btn").onclick = buscar;
+
+const fmt = {
+  brl: v => v == null ? "—" : v >= 1e12 ? `R$ ${(v/1e12).toFixed(2)}T` : v >= 1e9 ? `R$ ${(v/1e9).toFixed(1)}B` : v >= 1e6 ? `R$ ${(v/1e6).toFixed(1)}M` : `R$ ${v.toLocaleString("pt-BR")}`,
+  pct: v => v == null ? "—" : (v > 0 ? `+${v.toFixed(2)}%` : `${v.toFixed(2)}%`),
+  num: (v, d=2) => v == null ? "—" : Number(v).toFixed(d),
+};
+
+function kpi(label, value) {
+  return `<div class="kpi"><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div></div>`;
+}
+function section(title, gridClass, items) {
+  const html = items.map(([l,v]) => kpi(l,v)).join("");
+  return `<div class="section"><div class="section-title"><div class="section-bar"></div>${title}</div><div class="${gridClass}">${html}</div></div>`;
+}
+
+let currentTab = "valuation";
+let currentData = null;
+
+function renderTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  const d = currentData;
+  const ind = d.indicadores, bal = d.balanco, res = d.resultados;
+  let html = "";
+  if (tab === "valuation") {
+    html += section("Múltiplos de Preço", "kpi-grid-sm", [
+      ["P/L", fmt.num(ind.pl)], ["P/VP", fmt.num(ind.pvp)], ["P/EBIT", fmt.num(ind.pebit)],
+      ["PSR", fmt.num(ind.psr)], ["P/Ativos", fmt.num(ind.p_ativos)],
+      ["EV/EBITDA", fmt.num(ind.ev_ebitda)], ["EV/EBIT", fmt.num(ind.ev_ebit)],
+    ]);
+    html += section("Por Ação", "kpi-grid-sm", [
+      ["LPA", `R$ ${fmt.num(ind.lpa)}`], ["VPA", `R$ ${fmt.num(ind.vpa)}`],
+      ["Div. Yield", `${fmt.num(ind.div_yield)}%`],
+    ]);
+  } else if (tab === "rentabilidade") {
+    html += section("Margens", "kpi-grid-sm", [
+      ["Marg. Bruta", `${fmt.num(ind.marg_bruta)}%`],
+      ["Marg. EBIT",  `${fmt.num(ind.marg_ebit)}%`],
+      ["Marg. Líquida", `${fmt.num(ind.marg_liquida)}%`],
+    ]);
+    html += section("Retorno & Eficiência", "kpi-grid-sm", [
+      ["ROE", `${fmt.num(ind.roe)}%`], ["ROIC", `${fmt.num(ind.roic)}%`],
+      ["EBIT/Ativo", `${fmt.num(ind.ebit_ativo)}%`],
+      ["Giro Ativos", fmt.num(ind.giro_ativos)], ["Cres. 5a", `${fmt.num(ind.cres_rec_5a)}%`],
+    ]);
+  } else if (tab === "balanco") {
+    html += section("Ativo", "kpi-grid", [
+      ["Ativo Total", fmt.brl(bal.ativo)],
+      ["Ativo Circulante", fmt.brl(bal.ativo_circulante)],
+      ["Disponibilidades", fmt.brl(bal.disponibilidades)],
+    ]);
+    html += section("Passivo & Patrimônio", "kpi-grid", [
+      ["Patrim. Líquido", fmt.brl(bal.patrim_liq)],
+      ["Dív. Bruta", fmt.brl(bal.div_bruta)],
+      ["Dív. Líquida", fmt.brl(bal.div_liquida)],
+      ["Dív. Br./Patr.", fmt.num(ind.div_br_patrim)],
+      ["Liquidez Corr.", fmt.num(ind.liquidez_corr)],
+    ]);
+  } else if (tab === "resultados") {
+    html += section("Últimos 12 meses", "kpi-grid", [
+      ["Receita Líquida", fmt.brl(res.ultimos_12m.receita_liquida)],
+      ["EBIT", fmt.brl(res.ultimos_12m.ebit)],
+      ["Lucro Líquido", fmt.brl(res.ultimos_12m.lucro_liquido)],
+    ]);
+    html += section("Últimos 3 meses", "kpi-grid", [
+      ["Receita Líquida", fmt.brl(res.ultimos_3m.receita_liquida)],
+      ["EBIT", fmt.brl(res.ultimos_3m.ebit)],
+      ["Lucro Líquido", fmt.brl(res.ultimos_3m.lucro_liquido)],
+    ]);
+  }
+  document.getElementById("tab-content").innerHTML = html;
+}
+
+function render(d) {
+  currentData = d;
+  const osc = d.oscilacoes;
+
+  document.getElementById("h-papel").textContent = d.papel;
+  document.getElementById("h-tipo").textContent = d.tipo;
+  document.getElementById("h-empresa").textContent = d.empresa;
+  document.getElementById("h-setor").textContent = `${d.setor} · ${d.subsetor}`;
+  document.getElementById("h-cotacao").textContent = `R$ ${Number(d.cotacao).toFixed(2)}`;
+  const varEl = document.getElementById("h-var");
+  varEl.textContent = `${fmt.pct(osc.dia)} hoje`;
+  varEl.style.color = osc.dia >= 0 ? "#22d3a5" : "#f87171";
+  document.getElementById("h-data").textContent = d.data_ult_cot;
+
+  const pct = Math.min(100, Math.max(2, ((d.cotacao - d.min_52_sem) / (d.max_52_sem - d.min_52_sem)) * 100));
+  document.getElementById("r-min").textContent = `Mín 52s · R$ ${Number(d.min_52_sem).toFixed(2)}`;
+  document.getElementById("r-cur").textContent = `R$ ${Number(d.cotacao).toFixed(2)}`;
+  document.getElementById("r-max").textContent = `Máx 52s · R$ ${Number(d.max_52_sem).toFixed(2)}`;
+  document.getElementById("r-fill").style.width = `${pct}%`;
+  document.getElementById("r-dot").style.left = `${pct}%`;
+
+  document.getElementById("kpi-mercado").innerHTML = [
+    kpi("Valor de Mercado", fmt.brl(d.valor_de_mercado)),
+    kpi("Valor da Firma",   fmt.brl(d.valor_da_firma)),
+    kpi("Nº de Ações",      `${(d.nro_acoes/1e9).toFixed(2)}B`),
+    kpi("Vol. Méd. (2m)",   fmt.brl(d.vol_med_2m)),
+  ].join("");
+
+  const oscLabels = [["Hoje","dia"],["Mês","mes"],["30 dias","trinta_dias"],["12 meses","doze_meses"],["2026","ano_corrente"],["2025","ano_anterior"],["2024","dois_anos_atras"]];
+  document.getElementById("osc-strip").innerHTML = oscLabels.map(([l,k]) => {
+    const v = osc[k]; const cls = v >= 0 ? "pos" : "neg";
+    return `<div class="osc-item"><div class="osc-label">${l}</div><div class="osc-val ${cls}">${fmt.pct(v)}</div></div>`;
+  }).join("");
+
+  const tabs = [["valuation","Valuation"],["rentabilidade","Rentabilidade"],["balanco","Balanço"],["resultados","Resultados"]];
+  document.getElementById("tabs-bar").innerHTML = tabs.map(([id,label]) =>
+    `<button class="tab-btn${id===currentTab?' active':''}" data-tab="${id}" onclick="renderTab('${id}')">${label}</button>`
+  ).join("");
+
+  renderTab(currentTab);
+  document.getElementById("footer").textContent = `Dados: Fundamentus · ${d.data_ult_cot}`;
+
+  document.getElementById("result").classList.remove("hidden");
+  document.getElementById("empty").classList.add("hidden");
+}
+
+async function buscar() {
+  const papel = document.getElementById("search").value.trim().toUpperCase();
+  if (!papel) return;
+  document.getElementById("loading-ticker").textContent = papel;
+  document.getElementById("loading").classList.remove("hidden");
+  document.getElementById("error").classList.add("hidden");
+  document.getElementById("result").classList.add("hidden");
+  document.getElementById("empty").classList.add("hidden");
+  document.getElementById("btn").disabled = true;
+
+  try {
+    const res = await fetch(`/api/ativo/${papel}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Erro ao buscar dados");
+    render(data);
+  } catch(e) {
+    document.getElementById("error").textContent = "⚠ " + e.message;
+    document.getElementById("error").classList.remove("hidden");
+    document.getElementById("empty").classList.add("hidden");
+  } finally {
+    document.getElementById("loading").classList.add("hidden");
+    document.getElementById("btn").disabled = false;
+  }
+}
+</script>
+</body>
+</html>
