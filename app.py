@@ -17,24 +17,28 @@ def parse_num(s):
 def scrape(papel):
     url = f"https://www.fundamentus.com.br/detalhes.php?papel={papel.upper()}"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept-Language": "pt-BR,pt;q=0.9",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Referer": "https://www.fundamentus.com.br/",
+        "Connection": "keep-alive",
     }
-    r = requests.get(url, headers=headers, timeout=20)
+    session = requests.Session()
+    # Primeira visita à home para pegar cookies
+    session.get("https://www.fundamentus.com.br/", headers=headers, timeout=20)
+    r = session.get(url, headers=headers, timeout=20)
     r.encoding = "iso-8859-1"
     soup = BeautifulSoup(r.text, "html.parser")
 
-    # Coleta todos os pares label → valor das tabelas
     data = {}
     rows = soup.find_all("tr")
     for row in rows:
         cells = row.find_all("td")
-        # Percorre células em pares
         i = 0
         while i < len(cells) - 1:
             label_td = cells[i]
             value_td = cells[i + 1]
-            # Label fica dentro de span.txt ou direto no td
             span = label_td.find("span", class_="txt")
             label = (span.get_text(strip=True) if span else label_td.get_text(strip=True))
             label = label.replace("?", "").strip()
@@ -43,33 +47,46 @@ def scrape(papel):
                 data[label] = value
             i += 2
 
-    return data
+    return data, r.status_code, r.text[:500]
 
 @app.route("/")
 def index():
     return send_from_directory(app.root_path, "index.html")
 
+@app.route("/api/debug/<papel>")
+def debug(papel):
+    """Rota de diagnóstico — remova depois"""
+    try:
+        data, status, preview = scrape(papel)
+        return jsonify({
+            "status_code": status,
+            "keys_found": list(data.keys()),
+            "html_preview": preview,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/api/ativo/<papel>")
 def ativo(papel):
     try:
-        data = scrape(papel)
+        data, status, _ = scrape(papel)
 
         if not data.get("Papel") and not data.get("Cotação"):
-            return jsonify({"error": f"Papel '{papel}' não encontrado no Fundamentus"}), 404
+            return jsonify({"error": f"Papel '{papel}' não encontrado (status {status})"}), 404
 
         def g(key):
             return data.get(key, "")
 
-        # Resultados: a página tem duas colunas — 12m e 3m na mesma linha
-        # Precisamos pegar duplicatas manualmente
-        url = f"https://www.fundamentus.com.br/detalhes.php?papel={papel.upper()}"
-        headers = {"User-Agent": "Mozilla/5.0", "Accept-Language": "pt-BR"}
-        r = requests.get(url, headers=headers, timeout=20)
-        r.encoding = "iso-8859-1"
-        soup = BeautifulSoup(r.text, "html.parser")
-
         receitas, ebits, lucros = [], [], []
-        for row in soup.find_all("tr"):
+        url = f"https://www.fundamentus.com.br/detalhes.php?papel={papel.upper()}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Referer": "https://www.fundamentus.com.br/",
+        }
+        r2 = requests.get(url, headers=headers, timeout=20)
+        r2.encoding = "iso-8859-1"
+        soup2 = BeautifulSoup(r2.text, "html.parser")
+        for row in soup2.find_all("tr"):
             cells = row.find_all("td")
             labels = [c.get_text(strip=True).replace("?","").strip() for c in cells]
             values = [c.get_text(strip=True) for c in cells]
@@ -146,7 +163,6 @@ def ativo(papel):
                 "ano_anterior":    parse_num(g("2025")),
                 "dois_anos_atras": parse_num(g("2024")),
             },
-            "_debug_keys": list(data.keys())[:30]  # remova depois de confirmar
         }
 
         return jsonify(result)
@@ -155,4 +171,4 @@ def ativo(papel):
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
