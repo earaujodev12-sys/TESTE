@@ -2,6 +2,8 @@ from flask import Flask, render_template_string, jsonify, request
 import cloudscraper
 from bs4 import BeautifulSoup
 import os
+import time
+import random
 
 app = Flask(__name__)
 
@@ -264,8 +266,8 @@ function get(f, ...keys) {
 }
 
 function renderDashboard(d, ticker) {
-  const f = d.fundamentus;
-  const divs = d.dividendos;
+  const f = d.fundamentus || {};
+  const divs = d.dividendos || [];
 
   document.getElementById('heroTicker').textContent = ticker;
   document.getElementById('heroNome').textContent = get(f,'Empresa') === 'N/A' ? '' : get(f,'Empresa');
@@ -379,10 +381,10 @@ function renderChart(divs) {
   gradient.addColorStop(1, 'rgba(0,255,136,0.01)');
   chartInstance = new Chart(ctx, {
     type: 'bar',
-    data: {
+     {
       labels: labels.map(l => { const [a,m] = l.split('-'); return meses[parseInt(m)-1]+'/'+a.slice(2); }),
       datasets: [{
-        label: 'Dividendo (R$)', data: valores,
+        label: 'Dividendo (R$)',  valores,
         backgroundColor: gradient, borderColor: '#00ff88',
         borderWidth: 1, borderRadius: 2, hoverBackgroundColor: 'rgba(0,255,136,0.6)',
       }]
@@ -419,89 +421,104 @@ function renderChart(divs) {
 </html>
 """
 
-def get_scraper():
-    return cloudscraper.create_scraper(
-        browser={'browser': 'chrome', 'platform': 'windows', 'mobile': False}
-    )
+def build_scraper():
+  scraper = cloudscraper.create_scraper(
+      browser={"browser": "chrome", "platform": "windows", "desktop": True},
+      interpreter="nodejs",
+      delay=7,
+  )
+  scraper.headers.update({
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+      "Referer": "https://www.fundamentus.com.br/",
+  })
+  return scraper
+
+def fetch_html(url, tries=3, timeout=30):
+  scraper = build_scraper()
+  last_error = None
+  for attempt in range(1, tries + 1):
+    time.sleep(random.uniform(0.6, 1.6))
+    try:
+      resp = scraper.get(url, timeout=timeout)
+      if resp.status_code == 200 and "Invista consciente" in resp.text:
+        return resp.text
+      if resp.status_code in (403, 429):
+        time.sleep(attempt * random.uniform(3.0, 6.0))
+        continue
+      time.sleep(attempt * random.uniform(1.5, 3.0))
+    except Exception as e:
+      last_error = e
+      time.sleep(attempt * random.uniform(2.0, 5.0))
+  raise RuntimeError(f"Falha ao buscar HTML após {tries} tentativas. Último erro: {last_error}")
 
 def scrape_fundamentus(ticker):
-    scraper = get_scraper()
-    url = f"https://www.fundamentus.com.br/detalhes.php?papel={ticker}"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "pt-BR,pt;q=0.9",
-        "Referer": "https://www.fundamentus.com.br/"
-    }
-    resp = scraper.get(url, headers=headers, timeout=15)
-    soup = BeautifulSoup(resp.text, "html.parser")
-    dados = {}
-    for row in soup.find_all("tr"):
-        cols = row.find_all("td")
-        for i in range(0, len(cols) - 1, 2):
-            label = cols[i].get_text(strip=True).replace("?", "").strip()
-            valor = cols[i+1].get_text(strip=True)
-            if label:
-                dados[label] = valor
-    return dados
+  url = f"https://www.fundamentus.com.br/detalhes.php?papel={ticker}"
+  html = fetch_html(url)
+  soup = BeautifulSoup(html, "html.parser")
+  dados = {}
+  for row in soup.find_all("tr"):
+    cols = row.find_all("td")
+    if len(cols) >= 2:
+      label = cols[0].get_text(strip=True).replace("?", "").strip()
+      valor = cols[1].get_text(strip=True).strip()
+      if label:
+        dados[label] = valor
+  return dados
 
 def scrape_dividendos(ticker):
-    scraper = get_scraper()
-    url = f"https://www.fundamentus.com.br/proventos.php?papel={ticker}&tipo=2"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "pt-BR,pt;q=0.9",
-        "Referer": "https://www.fundamentus.com.br/"
-    }
-    resp = scraper.get(url, headers=headers, timeout=15)
-    soup = BeautifulSoup(resp.text, "html.parser")
-    dividendos = []
-    tabela = soup.find("table", {"id": "resultado"})
-    if not tabela:
-        return dividendos
-    for row in tabela.find_all("tr")[1:]:
-        cols = [td.get_text(strip=True) for td in row.find_all("td")]
-        if len(cols) >= 3:
-            dividendos.append({
-                "data_com":  cols[0],
-                "valor":     cols[1],
-                "tipo":      cols[2],
-                "data_pgto": cols[3] if len(cols) > 3 else ""
-            })
+  url = f"https://www.fundamentus.com.br/proventos.php?papel={ticker}&tipo=2"
+  html = fetch_html(url)
+  soup = BeautifulSoup(html, "html.parser")
+  dividendos = []
+  tabela = soup.find("table", {"id": "resultado"})
+  if not tabela:
     return dividendos
+  for row in tabela.find_all("tr")[1:]:
+    cols = [td.get_text(strip=True) for td in row.find_all("td")]
+    if len(cols) >= 3:
+      dividendos.append({
+          "data_com":  cols[0],
+          "valor":     cols[1],
+          "tipo":      cols[2],
+          "data_pgto": cols[3] if len(cols) > 3 else ""
+      })
+  return dividendos
 
 @app.route("/")
 def index():
-    return render_template_string(HTML)
+  return render_template_string(HTML)
 
 @app.route("/dados")
 def dados():
-    ticker = request.args.get("ticker", "").upper().strip()
-    if not ticker:
-        return jsonify({"erro": "Ticker não informado."})
-    try:
-        f = scrape_fundamentus(ticker)
+  ticker = request.args.get("ticker", "").upper().strip()
+  if not ticker:
+    return jsonify({"erro": "Ticker não informado."})
 
-        # Modo debug: retorna tudo para diagnóstico
-        if request.args.get("debug"):
-            return jsonify({
-                "total_campos": len(f),
-                "campos": list(f.keys()),
-                "valores": dict(list(f.items())[:15])
-            })
+  try:
+    f = scrape_fundamentus(ticker)
 
-        if not f or len(f) < 5:
-            return jsonify({
-                "erro": f"Ticker '{ticker}' não encontrado.",
-                "campos_recebidos": len(f),
-                "campos": list(f.keys())
-            })
+    # modo debug para teste: /dados?ticker=PETR4&debug=1
+    if request.args.get("debug"):
+      return jsonify({
+          "total_campos": len(f),
+          "campos": list(f.keys()),
+          "amostra": dict(list(f.items())[:20]),
+      })
 
-        d = scrape_dividendos(ticker)
-        return jsonify({"fundamentus": f, "dividendos": d})
-    except Exception as e:
-        return jsonify({"erro": str(e)})
+    if not f or len(f) < 5:
+      return jsonify({
+          "erro": f"Ticker '{ticker}' não encontrado.",
+          "campos_recebidos": len(f),
+          "campos": list(f.keys())
+      })
+
+    d = scrape_dividendos(ticker)
+    return jsonify({"fundamentus": f, "dividendos": d})
+  except Exception as e:
+    return jsonify({"erro": f"Erro interno: {str(e)}"})
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+  port = int(os.environ.get("PORT", 10000))
+  app.run(host="0.0.0.0", port=port, debug=True)
