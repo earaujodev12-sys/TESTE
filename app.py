@@ -47,7 +47,7 @@ def scrape(papel):
 
 @app.route("/")
 def index():
-    return send_from_directory(os.path.join(app.root_path, "static"), "index.html")
+    return send_from_directory(app.root_path, "index.html")
 
 @app.route("/api/ativo/<papel>")
 def ativo(papel):
