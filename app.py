@@ -1,153 +1,98 @@
 from flask import Flask, send_from_directory, jsonify
 import os
-import cloudscraper
-from bs4 import BeautifulSoup
+import requests
 
 app = Flask(__name__)
-
-def parse_num(s):
-    if not s or s.strip() in ("-", ""):
-        return None
-    s = s.strip().replace(".", "").replace(",", ".").replace("%", "").replace("R$", "").strip()
-    try:
-        return float(s)
-    except:
-        return None
-
-def scrape(papel):
-    url = f"https://www.fundamentus.com.br/detalhes.php?papel={papel.upper()}"
-    scraper = cloudscraper.create_scraper()
-    r = scraper.get(url, timeout=20)
-    r.encoding = "iso-8859-1"
-    soup = BeautifulSoup(r.text, "html.parser")
-
-    data = {}
-    rows = soup.find_all("tr")
-    for row in rows:
-        cells = row.find_all("td")
-        i = 0
-        while i < len(cells) - 1:
-            label_td = cells[i]
-            value_td = cells[i + 1]
-            span = label_td.find("span", class_="txt")
-            label = (span.get_text(strip=True) if span else label_td.get_text(strip=True))
-            label = label.replace("?", "").strip()
-            value = value_td.get_text(strip=True)
-            if label:
-                data[label] = value
-            i += 2
-
-    return data, r.status_code, r.text[:500]
 
 @app.route("/")
 def index():
     return send_from_directory(app.root_path, "index.html")
 
-@app.route("/api/debug/<papel>")
-def debug(papel):
-    """Rota de diagnóstico — remova depois"""
-    try:
-        data, status, preview = scrape(papel)
-        return jsonify({
-            "status_code": status,
-            "keys_found": list(data.keys()),
-            "html_preview": preview,
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
 @app.route("/api/ativo/<papel>")
 def ativo(papel):
     try:
-        data, status, _ = scrape(papel)
+        papel = papel.upper()
 
-        if not data.get("Papel") and not data.get("Cotação"):
-            return jsonify({"error": f"Papel '{papel}' não encontrado (status {status})"}), 404
+        # Cotação + indicadores fundamentalistas
+        r = requests.get(
+            f"https://brapi.dev/api/quote/{papel}",
+            params={"fundamental": "true", "dividends": "true"},
+            timeout=20
+        )
+        data = r.json()
 
-        def g(key):
-            return data.get(key, "")
+        if "error" in data or not data.get("results"):
+            return jsonify({"error": f"Papel '{papel}' não encontrado"}), 404
 
-        receitas, ebits, lucros = [], [], []
-        url = f"https://www.fundamentus.com.br/detalhes.php?papel={papel.upper()}"
-        r2 = cloudscraper.create_scraper().get(url, timeout=20)
-        r2.encoding = "iso-8859-1"
-        soup2 = BeautifulSoup(r2.text, "html.parser")
-        for row in soup2.find_all("tr"):
-            cells = row.find_all("td")
-            labels = [c.get_text(strip=True).replace("?","").strip() for c in cells]
-            values = [c.get_text(strip=True) for c in cells]
-            for idx, lbl in enumerate(labels):
-                if "Receita Líquida" in lbl and idx+1 < len(values):
-                    receitas.append(parse_num(values[idx+1]))
-                if lbl == "EBIT" and idx+1 < len(values):
-                    ebits.append(parse_num(values[idx+1]))
-                if "Lucro Líquido" in lbl and idx+1 < len(values):
-                    lucros.append(parse_num(values[idx+1]))
+        q = data["results"][0]
+        fi = q.get("fundamentalIndicators") or {}
+        dv = (q.get("dividendsData") or {})
+        dy = dv.get("yield") if dv else None
 
         result = {
-            "papel":            g("Papel"),
-            "tipo":             g("Tipo"),
-            "empresa":          g("Empresa"),
-            "setor":            g("Setor"),
-            "subsetor":         g("Subsetor"),
-            "cotacao":          parse_num(g("Cotação")),
-            "data_ult_cot":     g("Data últ cot"),
-            "min_52_sem":       parse_num(g("Min 52 sem")),
-            "max_52_sem":       parse_num(g("Max 52 sem")),
-            "vol_med_2m":       parse_num(g("Vol $ méd (2m)")),
-            "valor_de_mercado": parse_num(g("Valor de mercado")),
-            "valor_da_firma":   parse_num(g("Valor da firma")),
-            "nro_acoes":        parse_num(g("Nro. Ações")),
+            "papel":            papel,
+            "tipo":             "ON" if papel.endswith("3") else "PN" if papel.endswith("4") else "",
+            "empresa":          q.get("longName") or q.get("shortName", ""),
+            "setor":            q.get("sector", ""),
+            "subsetor":         q.get("industry", ""),
+            "cotacao":          q.get("regularMarketPrice"),
+            "data_ult_cot":     q.get("regularMarketTime", ""),
+            "min_52_sem":       q.get("fiftyTwoWeekLow"),
+            "max_52_sem":       q.get("fiftyTwoWeekHigh"),
+            "vol_med_2m":       q.get("averageDailyVolume3Month"),
+            "valor_de_mercado": q.get("marketCap"),
+            "valor_da_firma":   q.get("enterpriseValue"),
+            "nro_acoes":        q.get("sharesOutstanding"),
             "indicadores": {
-                "pl":            parse_num(g("P/L")),
-                "pvp":           parse_num(g("P/VP")),
-                "pebit":         parse_num(g("P/EBIT")),
-                "psr":           parse_num(g("PSR")),
-                "p_ativos":      parse_num(g("P/Ativos")),
-                "div_yield":     parse_num(g("Div. Yield")),
-                "ev_ebitda":     parse_num(g("EV / EBITDA")),
-                "ev_ebit":       parse_num(g("EV / EBIT")),
-                "lpa":           parse_num(g("LPA")),
-                "vpa":           parse_num(g("VPA")),
-                "marg_bruta":    parse_num(g("Marg. Bruta")),
-                "marg_ebit":     parse_num(g("Marg. EBIT")),
-                "marg_liquida":  parse_num(g("Marg. Líquida")),
-                "ebit_ativo":    parse_num(g("EBIT / Ativo")),
-                "roic":          parse_num(g("ROIC")),
-                "roe":           parse_num(g("ROE")),
-                "liquidez_corr": parse_num(g("Liquidez Corr")),
-                "div_br_patrim": parse_num(g("Div Br/ Patrim")),
-                "giro_ativos":   parse_num(g("Giro Ativos")),
-                "cres_rec_5a":   parse_num(g("Cres. Rec (5a)")),
+                "pl":            q.get("priceEarnings") or fi.get("priceEarnings"),
+                "pvp":           fi.get("priceToBook"),
+                "pebit":         fi.get("priceToEbit"),
+                "psr":           fi.get("psr"),
+                "p_ativos":      fi.get("priceToAssets"),
+                "div_yield":     dy,
+                "ev_ebitda":     fi.get("enterpriseValue_Ebitda"),
+                "ev_ebit":       fi.get("enterpriseValue_Ebit"),
+                "lpa":           q.get("epsTrailingTwelveMonths"),
+                "vpa":           fi.get("bookValuePerShare"),
+                "marg_bruta":    q.get("grossMargins"),
+                "marg_ebit":     q.get("ebitdaMargins"),
+                "marg_liquida":  q.get("profitMargins"),
+                "ebit_ativo":    fi.get("ebitByAssets"),
+                "roic":          fi.get("returnOnInvestedCapital"),
+                "roe":           q.get("returnOnEquity"),
+                "liquidez_corr": fi.get("currentRatio"),
+                "div_br_patrim": fi.get("debtToEquity"),
+                "giro_ativos":   fi.get("assetTurnover"),
+                "cres_rec_5a":   fi.get("revenueGrowth5y"),
             },
             "balanco": {
-                "ativo":            parse_num(g("Ativo")),
-                "disponibilidades": parse_num(g("Disponibilidades")),
-                "ativo_circulante": parse_num(g("Ativo Circulante")),
-                "div_bruta":        parse_num(g("Dív. Bruta")),
-                "div_liquida":      parse_num(g("Dív. Líquida")),
-                "patrim_liq":       parse_num(g("Patrim. Líq")),
+                "ativo":            fi.get("totalAssets"),
+                "disponibilidades": fi.get("cash"),
+                "ativo_circulante": fi.get("currentAssets"),
+                "div_bruta":        fi.get("totalDebt"),
+                "div_liquida":      fi.get("netDebt"),
+                "patrim_liq":       fi.get("netPatrimony"),
             },
             "resultados": {
                 "ultimos_12m": {
-                    "receita_liquida": receitas[0] if len(receitas) > 0 else None,
-                    "ebit":            ebits[0]    if len(ebits)    > 0 else None,
-                    "lucro_liquido":   lucros[0]   if len(lucros)   > 0 else None,
+                    "receita_liquida": fi.get("netRevenue12m"),
+                    "ebit":            fi.get("ebit12m"),
+                    "lucro_liquido":   fi.get("netIncome12m"),
                 },
                 "ultimos_3m": {
-                    "receita_liquida": receitas[1] if len(receitas) > 1 else None,
-                    "ebit":            ebits[1]    if len(ebits)    > 1 else None,
-                    "lucro_liquido":   lucros[1]   if len(lucros)   > 1 else None,
+                    "receita_liquida": fi.get("netRevenue3m"),
+                    "ebit":            fi.get("ebit3m"),
+                    "lucro_liquido":   fi.get("netIncome3m"),
                 },
             },
             "oscilacoes": {
-                "dia":             parse_num(g("Dia")),
-                "mes":             parse_num(g("Mês")),
-                "trinta_dias":     parse_num(g("30 dias")),
-                "doze_meses":      parse_num(g("12 meses")),
-                "ano_corrente":    parse_num(g("2026")),
-                "ano_anterior":    parse_num(g("2025")),
-                "dois_anos_atras": parse_num(g("2024")),
+                "dia":             q.get("regularMarketChangePercent"),
+                "mes":             q.get("regularMarketChangePercent"),
+                "trinta_dias":     None,
+                "doze_meses":      q.get("fiftyTwoWeekHighChange"),
+                "ano_corrente":    None,
+                "ano_anterior":    None,
+                "dois_anos_atras": None,
             },
         }
 
