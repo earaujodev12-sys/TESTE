@@ -1,6 +1,4 @@
-streamlit
 flask
-cloudscraper
+requests
 beautifulsoup4
-pandas
-colorama
+gunicorn
