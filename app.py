@@ -1,6 +1,6 @@
 from flask import Flask, send_from_directory, jsonify
 import os
-import requests
+import cloudscraper
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
@@ -16,18 +16,8 @@ def parse_num(s):
 
 def scrape(papel):
     url = f"https://www.fundamentus.com.br/detalhes.php?papel={papel.upper()}"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Referer": "https://www.fundamentus.com.br/",
-        "Connection": "keep-alive",
-    }
-    session = requests.Session()
-    # Primeira visita à home para pegar cookies
-    session.get("https://www.fundamentus.com.br/", headers=headers, timeout=20)
-    r = session.get(url, headers=headers, timeout=20)
+    scraper = cloudscraper.create_scraper()
+    r = scraper.get(url, timeout=20)
     r.encoding = "iso-8859-1"
     soup = BeautifulSoup(r.text, "html.parser")
 
@@ -79,11 +69,7 @@ def ativo(papel):
 
         receitas, ebits, lucros = [], [], []
         url = f"https://www.fundamentus.com.br/detalhes.php?papel={papel.upper()}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Referer": "https://www.fundamentus.com.br/",
-        }
-        r2 = requests.get(url, headers=headers, timeout=20)
+        r2 = cloudscraper.create_scraper().get(url, timeout=20)
         r2.encoding = "iso-8859-1"
         soup2 = BeautifulSoup(r2.text, "html.parser")
         for row in soup2.find_all("tr"):
